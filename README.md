@@ -73,8 +73,7 @@ Spectred v0.3.16: 21
 - establishes gRPC connections with peers in the Spectre P2P network on port `18111`, performing a handshake to verify if nodes are active and compatible with the protocol version.
 - only nodes that have port `18111` open and allow inbound connections can be reached. If a node’s port `18111` is closed, it may still function in the network but won’t be accessible to this crawler since `18111` is essential for P2P communication in Spectre.
 - requests peers directly through the P2P protocol's `requestAddresses` rpc call.
-- for each unique IP address, the crawler queries the IPGeolocation API to fetch approximate coordinates, avoiding re-fetching for nodes that already have geolocation data.
-- using RELOAD_ALL=1 (default is 0), forces a refresh of all nodes with a new geolocation request, including those that already have `loc` data.
+- for each unique IP address, the crawler queries the IPGeolocation API to fetch approximate coordinates.
 - This IP-based geolocation is approximate, with database accuracy likely around 90%.
 - this crawler does not aim to retrieve a full list of all network nodes. It maps active and reachable nodes, to visualize the global distribution and diversity of the nodes participating in Spectre.
 
@@ -84,8 +83,7 @@ Results are stored in JSON format, structured by node attributes such as IP addr
 
 The API server uses FastAPI to:
 
-- triggers the crawler on startup and schedules it to run every 60 minutes.
-- skips nodes with existing location data, only updating new entries.
+- triggers the crawler on startup and schedules it to run every 12 hours.
 - logs each update, including successful geolocation retrievals and any errors.
 
 ## Increasing File Descriptor Limit

@@ -28,7 +28,6 @@ app.add_middleware(
 seed_node = os.getenv("SEED_NODE", False)
 verbose = os.getenv("VERBOSE", 0)
 api_key = os.getenv("IPGEOLOCATION_API_KEY", 0)
-reload_all = os.getenv("RELOAD_ALL", "0") == "1"  # reload all if set to 1
 
 logging.basicConfig(
     level=[logging.WARN, logging.INFO, logging.DEBUG][min(int(verbose), 2)]
@@ -78,7 +77,7 @@ async def get_ip_info(ip):
 
 @app.get("/")
 async def read_root():
-    """Read nodes from file and update with geolocation info only if loc is missing, unless RELOAD_ALL is set."""
+    """Return the contents of nodes.json without updating any geolocation data."""
     if not os.path.exists(NODE_OUTPUT_FILE):
         logging.error("nodes.json file does not exist. Run the crawler first.")
         return {"error": "nodes.json file does not exist. Run the crawler first."}
@@ -90,25 +89,6 @@ async def read_root():
         logging.error("nodes.json contains invalid JSON data.")
         return {"error": "nodes.json contains invalid JSON data."}
 
-    nodes_updated = 0
-    for ip, node_data in data["nodes"].items():
-        if node_data.get("loc") and not reload_all:
-            logging.info(f"Skipping geolocation for {ip} as it already has loc data.")
-        else:
-            logging.info(
-                f"Fetching geolocation for {ip} as it has no loc data or RELOAD_ALL is set."
-            )
-            location = await get_ip_info(extract_ip_address(ip))
-            if location:
-                node_data["loc"] = location
-                nodes_updated += 1
-                logging.info(f"Geolocation for {ip} updated to {location}.")
-            else:
-                logging.warning(f"Failed to retrieve geolocation for {ip}.")
-
-    logging.info(
-        f"Geolocation update complete. {nodes_updated} nodes updated with new location data."
-    )
     return data
 
 

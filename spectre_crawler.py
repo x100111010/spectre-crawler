@@ -222,9 +222,7 @@ async def get_addresses(
         logging.debug("Task was canceled")
 
 
-async def main(
-    addresses, network, output, api_key=None, start_address=None, reload_all=False
-):
+async def main(addresses, network, output, api_key=None, start_address=None):
     # ulimit differently based on the operating system
     if platform.system() == "Windows":
         ulimit = 100  # limit for Windows
@@ -365,11 +363,6 @@ if __name__ == "__main__":
         default="spectre-mainnet",
     )
     parser.add_argument("--api_key", help="API key for ipgeolocation.io")
-    parser.add_argument(
-        "--reload-all",
-        help="Reload geolocation data for all nodes, even if already populated",
-        action="store_true",
-    )
 
     args = parser.parse_args()
 
@@ -396,6 +389,5 @@ if __name__ == "__main__":
             args.output,
             api_key=args.api_key,
             start_address=args.addr,
-            reload_all=args.reload_all,
         )
     )
