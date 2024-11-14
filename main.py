@@ -116,7 +116,7 @@ async def read_root():
 def init_data():
     """Initialize scheduled crawler job on server startup and trigger the first run."""
     scheduler = BackgroundScheduler()
-    scheduler.add_job(update_nodes, "interval", minutes=60)
+    scheduler.add_job(update_nodes, "interval", hours=12)
     scheduler.start()
 
 
