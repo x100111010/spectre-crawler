@@ -119,9 +119,6 @@ def init_data():
     scheduler.add_job(update_nodes, "interval", minutes=60)
     scheduler.start()
 
-    # trigger first run
-    asyncio.create_task(update_nodes_async())
-
 
 async def update_nodes_async() -> None:
     """Run the crawler asynchronously."""
