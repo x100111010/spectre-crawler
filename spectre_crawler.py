@@ -15,6 +15,51 @@ import messages_pb2
 import messages_pb2_grpc
 
 
+def filter_obfuscate(nodes):
+    """
+    Remove duplicate ids, obfuscate IP and filter nodes without loc data.
+    """
+    unique_nodes = {}
+    seen_ids = {}
+
+    for ip_port, node_data in nodes.items():
+        node_id = node_data.get("id")
+        loc = node_data.get("loc", "").strip()
+
+        # skip missing loc
+        if not loc:
+            logging.warning(f"skipped, missing location: {node_data}")
+            continue
+
+        # handle duplicate
+        if node_id in seen_ids:
+            logging.info(f"Duplicate id found: {node_id}.")
+            continue
+
+        seen_ids[node_id] = True
+
+        # obfuscate
+        try:
+            if ip_port.startswith("ipv6:["):
+                # ip6
+                ip, port = ip_port[6:].rsplit("]:", 1)
+                obfuscated_ip = f"{ip[:4]}:**:**:**"
+                obfuscated_key = f"ipv6:[{obfuscated_ip}]:{port}"
+            else:
+                # ip4
+                ip, port = ip_port.rsplit(":", 1)
+                ip_parts = ip.split(".")
+                obfuscated_ip = f"{ip_parts[0]}.**.**.{ip_parts[-1]}"
+                obfuscated_key = f"{obfuscated_ip}:{port}"
+
+            unique_nodes[obfuscated_key] = node_data
+        except (ValueError, IndexError) as e:
+            logging.error(f"Malformed address skipped: {ip_port} ({e})")
+            continue
+
+    return unique_nodes
+
+
 async def message_stream(queue):
     message = await queue.get()
     while message is not None:
@@ -341,10 +386,12 @@ async def main(addresses, network, output, api_key=None, start_address=None):
                 clean_res[i] = res[i]
                 del clean_res[i]["neighbors"]
 
+        unique_nodes = filter_obfuscate(clean_res)
+
         async with semaphore:
-            if len(clean_res) >= 10:
+            if len(unique_nodes) >= 10:
                 json.dump(
-                    {"nodes": clean_res, "updated_at": int(time.time())},
+                    {"nodes": unique_nodes, "updated_at": int(time.time())},
                     open(output, "w"),
                     allow_nan=False,
                     indent=2,
