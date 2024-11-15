@@ -2,13 +2,11 @@ import asyncio
 import json
 import os
 import logging
-import aiohttp
-import re
+import atexit
 
 from fastapi import FastAPI
 from spectre_crawler import main
 from dotenv import load_dotenv
-from cache import AsyncLRU
 from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -35,44 +33,9 @@ logging.basicConfig(
 
 NODE_OUTPUT_FILE = "data/nodes.json"
 
+loop = asyncio.get_event_loop()
 
-def extract_ip_address(input_string):
-    pattern = r"(?:ipv6:\[([:0-9a-fA-F]+)\]|(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}))"
-    match = re.search(pattern, input_string)
-
-    if match:
-        ipv6_address = match.group(1)
-        ipv4_address = match.group(2)
-
-        if ipv6_address:
-            return ipv6_address
-        elif ipv4_address:
-            return ipv4_address
-        else:
-            return None
-    else:
-        return None
-
-
-@AsyncLRU(maxsize=8192)
-async def get_ip_info(ip):
-    """Fetch IP geolocation using ipgeolocation.io."""
-    url = f"https://api.ipgeolocation.io/ipgeo?apiKey={api_key}&ip={ip}&fields=country_name,city,latitude,longitude"
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url) as response:
-            if response.status == 200:
-                res = await response.json()
-                latitude = res.get("latitude")
-                longitude = res.get("longitude")
-
-                # loc as "latitude,longitude"
-                if latitude and longitude:
-                    return f"{latitude},{longitude}"
-            else:
-                logging.warning(
-                    f"Geolocation request for {ip} failed with status {response.status}"
-                )
-            return None
+scheduler = BackgroundScheduler()
 
 
 @app.get("/")
@@ -94,10 +57,10 @@ async def read_root():
 
 @app.on_event("startup")
 def init_data():
-    """Initialize scheduled crawler job on server startup and trigger the first run."""
-    scheduler = BackgroundScheduler()
+    """Initialize scheduled crawler job on server startup."""
     scheduler.add_job(update_nodes, "interval", hours=12)
     scheduler.start()
+    logging.info("Scheduler started")
 
 
 async def update_nodes_async() -> None:
@@ -117,6 +80,16 @@ def update_nodes() -> None:
     """Wrap the async update_nodes call in asyncio with timeout."""
     max_runtime = 15 * 60
     try:
-        asyncio.run(asyncio.wait_for(update_nodes_async(), timeout=max_runtime))
+        asyncio.run_coroutine_threadsafe(
+            asyncio.wait_for(update_nodes_async(), timeout=max_runtime), loop
+        )
     except asyncio.TimeoutError:
         logging.warning(f"Job exceeded max runtime of {max_runtime} seconds")
+
+
+def shutdown_scheduler():
+    logging.info("Shutting down scheduler.")
+    scheduler.shutdown(wait=True)
+
+
+atexit.register(shutdown_scheduler)

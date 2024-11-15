@@ -77,13 +77,13 @@ Spectred v0.3.16: 21
 - This IP-based geolocation is approximate, with database accuracy likely around 90%.
 - this crawler does not aim to retrieve a full list of all network nodes. It maps active and reachable nodes, to visualize the global distribution and diversity of the nodes participating in Spectre.
 
-Results are stored in JSON format, structured by node attributes such as IP address, geolocation, node ID, and `spectred` version.
+Results are stored in JSON format, structured by node attributes such as IP address, geolocation, node ID, protocol_version, and `spectred` version.
 
 ### API Server (`main.py`)
 
 The API server uses FastAPI to:
 
-- triggers the crawler on startup and schedules it to run every 12 hours.
+- schedules crawler to run every 12 hours.
 - logs each update, including successful geolocation retrievals and any errors.
 
 ## Increasing File Descriptor Limit

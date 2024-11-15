@@ -55,7 +55,7 @@ class P2PNode(object):
                 logging.debug(
                     f"Requesting geolocation for {addr} (retries left: {retries})"
                 )
-                api_url = f"https://api.ipgeolocation.io/ipgeo?apiKey={self.api_key}&ip={addr}&fields=country_name,city,latitude,longitude"
+                api_url = f"https://api.ipgeolocation.io/ipgeo?apiKey={self.api_key}&ip={addr}&fields=latitude,longitude"
 
                 async with session.get(api_url) as response:
                     if response.status != 200:
@@ -185,6 +185,7 @@ async def get_addresses(
         patience = 10
         peer_id = ""
         peer_spectred = ""
+        protocol_version = None
         loc = ""
         try:
             async with aiohttp.ClientSession() as session:
@@ -193,6 +194,7 @@ async def get_addresses(
                 ) as node:
                     peer_id = node.peer_id.hex()
                     peer_spectred = node.peer_spectred
+                    protocol_version = node.peer_version
                     prev = time.time()
                     while len(addresses) > prev_size or patience > 0:
                         if time.time() - prev > 5:
@@ -212,12 +214,20 @@ async def get_addresses(
 
         except asyncio.exceptions.TimeoutError:
             logging.debug("Node %s timed out", address)
-            return address, peer_id, peer_spectred, addresses, "timeout", loc
+            return (
+                address,
+                peer_id,
+                peer_spectred,
+                protocol_version,
+                addresses,
+                "timeout",
+                loc,
+            )
         except Exception as e:
             logging.exception("Error in task")
-            return address, peer_id, peer_spectred, addresses, e, loc
+            return address, peer_id, peer_spectred, protocol_version, addresses, e, loc
 
-        return address, peer_id, peer_spectred, addresses, "", loc
+        return address, peer_id, peer_spectred, protocol_version, addresses, "", loc
     except asyncio.CancelledError:
         logging.debug("Task was canceled")
 
@@ -265,7 +275,15 @@ async def main(addresses, network, output, api_key=None, start_address=None):
                     result = task.result()
                     if result is None:
                         continue
-                    address, peer_id, peer_spectred, addresses, error, loc = result
+                    (
+                        address,
+                        peer_id,
+                        peer_spectred,
+                        protocol_version,
+                        addresses,
+                        error,
+                        loc,
+                    ) = result
                 except asyncio.TimeoutError:
                     logging.warning("Task timed out and was cancelled")
                     continue
@@ -274,6 +292,7 @@ async def main(addresses, network, output, api_key=None, start_address=None):
                     "neighbors": [],
                     "id": peer_id,
                     "spectred": peer_spectred,
+                    "protocolVersion": protocol_version,
                     "error": error,
                     "loc": loc,
                 }
@@ -353,7 +372,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--addr",
         help="Start ip:port for crawling",
-        default="n-mainnet.spectre.ws:18111",
+        default="mainnet-dnsseed-1.spectre-network.org:18111",
     )
     parser.add_argument("--output", help="output json path", default="data/nodes.json")
     parser.add_argument(
