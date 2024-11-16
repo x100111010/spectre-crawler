@@ -5,6 +5,7 @@ import logging
 import atexit
 
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse, RedirectResponse
 from spectre_crawler import main
 from dotenv import load_dotenv
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -40,17 +41,28 @@ scheduler = BackgroundScheduler()
 
 @app.get("/")
 async def read_root():
+    """Redirect the root endpoint to /nodes."""
+    return RedirectResponse(url="/nodes")
+
+
+@app.get("/nodes")
+async def read_nodes():
     """Return the contents of nodes.json without updating any geolocation data."""
     if not os.path.exists(NODE_OUTPUT_FILE):
         logging.error("nodes.json file does not exist. Run the crawler first.")
-        return {"error": "nodes.json file does not exist. Run the crawler first."}
+        return JSONResponse(
+            content={"error": "nodes.json file does not exist. Run the crawler first."},
+            status_code=404,
+        )
 
     try:
         with open(NODE_OUTPUT_FILE, "r") as f:
             data = json.loads(f.read())
     except json.JSONDecodeError:
         logging.error("nodes.json contains invalid JSON data.")
-        return {"error": "nodes.json contains invalid JSON data."}
+        return JSONResponse(
+            content={"error": "nodes.json contains invalid JSON data."}, status_code=400
+        )
 
     return data
 
