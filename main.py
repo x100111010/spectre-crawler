@@ -5,7 +5,7 @@ import logging
 import atexit
 
 from fastapi import FastAPI
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse
 from spectre_crawler import main
 from dotenv import load_dotenv
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -37,12 +37,6 @@ NODE_OUTPUT_FILE = "data/nodes.json"
 loop = asyncio.get_event_loop()
 
 scheduler = BackgroundScheduler()
-
-
-@app.get("/")
-async def read_root():
-    """Redirect the root endpoint to /nodes."""
-    return RedirectResponse(url="/nodes")
 
 
 @app.get("/nodes")
