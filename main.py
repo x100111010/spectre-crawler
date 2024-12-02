@@ -2,13 +2,12 @@ import asyncio
 import json
 import os
 import logging
-import atexit
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from spectre_crawler import main
 from dotenv import load_dotenv
-from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi.middleware.cors import CORSMiddleware
 
 load_dotenv(override=True)
@@ -34,9 +33,7 @@ logging.basicConfig(
 
 NODE_OUTPUT_FILE = "data/nodes.json"
 
-loop = asyncio.get_event_loop()
-
-scheduler = BackgroundScheduler()
+scheduler = AsyncIOScheduler()
 
 
 @app.get("/nodes")
@@ -62,40 +59,36 @@ async def read_nodes():
 
 
 @app.on_event("startup")
-def init_data():
+async def init_data():
     """Initialize scheduled crawler job on server startup."""
-    scheduler.add_job(update_nodes, "interval", hours=12)
+    scheduler.add_job(update_nodes, "interval", hours=24)
     scheduler.start()
     logging.info("Scheduler started")
 
 
-async def update_nodes_async() -> None:
+async def update_nodes():
     """Run the crawler asynchronously."""
     logging.info("Starting crawler job")
     hostpair = seed_node.split(":") if ":" in seed_node else (seed_node, "18111")
-    await main(
-        [hostpair],
-        "spectre-mainnet",
-        NODE_OUTPUT_FILE,
-        api_key=api_key,
-        start_address=seed_node,
-    )
-
-
-def update_nodes() -> None:
-    """Wrap the async update_nodes call in asyncio with timeout."""
-    max_runtime = 15 * 60
     try:
-        asyncio.run_coroutine_threadsafe(
-            asyncio.wait_for(update_nodes_async(), timeout=max_runtime), loop
+        await asyncio.wait_for(
+            main(
+                [hostpair],
+                "spectre-mainnet",
+                NODE_OUTPUT_FILE,
+                api_key=api_key,
+                start_address=seed_node,
+            ),
+            timeout=30 * 60,  # 30min
         )
     except asyncio.TimeoutError:
-        logging.warning(f"Job exceeded max runtime of {max_runtime} seconds")
+        logging.warning("Crawler job exceeded the maximum runtime of 15 minutes.")
+    except Exception as e:
+        logging.error(f"An error occurred during the crawler job: {e}")
 
 
-def shutdown_scheduler():
+@app.on_event("shutdown")
+async def shutdown_scheduler():
+    """Shutdown the scheduler gracefully."""
     logging.info("Shutting down scheduler.")
     scheduler.shutdown(wait=True)
-
-
-atexit.register(shutdown_scheduler)
