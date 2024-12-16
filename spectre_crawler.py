@@ -102,7 +102,8 @@ class P2PNode(object):
                 )
                 api_url = f"https://api.ipgeolocation.io/ipgeo?apiKey={self.api_key}&ip={addr}&fields=latitude,longitude"
 
-                async with session.get(api_url) as response:
+                timeout = aiohttp.ClientTimeout(total=15)  # 15 seconds timeout
+                async with session.get(api_url, timeout=timeout) as response:
                     if response.status != 200:
                         logging.warning(
                             f"Geolocation request for {addr} failed with status {response.status}"
